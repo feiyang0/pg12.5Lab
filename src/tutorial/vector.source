@@ -1,0 +1,68 @@
+CREATE FUNCTION vector_in(cstring)
+   RETURNS vector
+   AS '_OBJWD_/vector'
+   LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION vector_out(vector)
+   RETURNS cstring
+   AS '_OBJWD_/vector'
+   LANGUAGE C IMMUTABLE STRICT;
+
+
+CREATE TYPE vector (
+   input = vector_in,
+   output = vector_out
+);
+
+CREATE FUNCTION vector_dimension(vector) 
+   RETURNS int
+   AS '_OBJWD_/vector' 
+   LANGUAGE C IMMUTABLE STRICT;
+
+CREATE OPERATOR <#> (
+   rightarg = vector,
+   procedure = vector_dimension
+);
+
+CREATE FUNCTION vector_distance(vector, vector)
+   RETURNS real
+   AS '_OBJWD_/vector'
+   LANGUAGE C IMMUTABLE STRICT;
+
+CREATE OPERATOR <-> (
+   leftarg = vector,
+   rightarg = vector,
+   procedure = vector_distance
+);
+
+CREATE FUNCTION vector_add(vector, vector)
+   RETURNS vector
+   AS '_OBJWD_/vector'
+   LANGUAGE C IMMUTABLE STRICT;
+
+CREATE OPERATOR + (
+   leftarg = vector,
+   rightarg = vector,
+   procedure = vector_add,
+   commutator = +
+);
+
+CREATE FUNCTION vector_sub(vector, vector)
+   RETURNS vector
+   AS '_OBJWD_/vector' 
+   LANGUAGE C IMMUTABLE STRICT;
+
+CREATE OPERATOR - (
+   leftarg = vector,
+   rightarg = vector,
+   procedure = vector_sub
+);
+
+ create table test_vector (id integer primary key, vec vector);
+ insert into test_vector values (2, '{1,}');
+ insert into test_vector values (2, '{1, 2, 3, 5, 3,}');
+ insert into test_vector values (2, '{1,,2}');
+ insert into test_vector values (2, '{,}');
+
+ DROP TABLE test_vector;
+ DROP TYPE vector CASCADE;
