@@ -275,6 +275,7 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				 * Create the hash table.  If using Parallel Hash, then
 				 * whoever gets here first will create the hash table and any
 				 * later arrivals will merely attach to it.
+				 * 根据内表评估信息预估hash_table的大小，并初始hash_table
 				 */
 				hashtable = ExecHashTableCreate(hashNode,
 												node->hj_HashOperators,
@@ -286,6 +287,7 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				 * Execute the Hash node, to build the hash table.  If using
 				 * Parallel Hash, then we'll try to help hashing unless we
 				 * arrived too late.
+				 * 读取内表全部tuple构建hash_table
 				 */
 				hashNode->hashtable = hashtable;
 				(void) MultiExecProcNode((PlanState *) hashNode);
@@ -346,6 +348,7 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 
 				/*
 				 * We don't have an outer tuple, try to get the next one
+				 * 从外表中获取下一个tuple，并计算hashvalue
 				 */
 				if (parallel)
 					outerTupleSlot =
@@ -375,6 +378,7 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				/*
 				 * Find the corresponding bucket for this tuple in the main
 				 * hash table or skew hash table.
+				 * 获取哈希桶号及batch号
 				 */
 				node->hj_CurHashValue = hashvalue;
 				ExecHashGetBucketAndBatch(hashtable, hashvalue,
@@ -419,6 +423,7 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 
 				/*
 				 * Scan the selected hash bucket for matches to current outer
+				 * 检查是否有匹配的数据
 				 */
 				if (parallel)
 				{
@@ -443,6 +448,7 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				 * We've got a match, but still need to test non-hashed quals.
 				 * ExecScanHashBucket already set up all the state needed to
 				 * call ExecQual.
+				 * 找到满足条件hashvalue的tuple，做进一步的条件检查。
 				 *
 				 * If we pass the qual, then save state for next call and have
 				 * ExecProject form the projection, store it in the tuple
@@ -471,6 +477,7 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 						/*
 						 * This is really only needed if HJ_FILL_INNER(node),
 						 * but we'll avoid the branch and just set it always.
+						 * 把满足条件的tuple保存在hj_CurTuple中
 						 */
 						HeapTupleHeaderSetMatch(HJTUPLE_MINTUPLE(node->hj_CurTuple));
 					}
@@ -486,11 +493,16 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 					 * If we only need to join to the first matching inner
 					 * tuple, then consider returning this one, but after that
 					 * continue with next outer tuple.
+					 * 调用ExecProject投影并输出符合条件的记录
+					 * ret返回后，下次再进入该函数从HJ_NEED_NEW_OUTER分支开始
+					 * 接着上次处理的tuple，扫描下一个tuple,直到join结束
 					 */
 					if (node->js.single_match)
 						node->hj_JoinState = HJ_NEED_NEW_OUTER;
 
-					if (otherqual == NULL || ExecQual(otherqual, econtext))
+                    econtext->ecxt_innertuple = node->hj_NullInnerTupleSlot;
+
+                    if (otherqual == NULL || ExecQual(otherqual, econtext))
 						return ExecProject(node->js.ps.ps_ProjInfo);
 					else
 						InstrCountFiltered2(node, 1);
@@ -500,7 +512,7 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				break;
 
 			case HJ_FILL_OUTER_TUPLE:
-
+src/backend/executor/nodeHashjoin.c
 				/*
 				 * The current outer tuple has run out of matches, so check
 				 * whether to emit a dummy outer-join tuple.  Whether we emit
@@ -508,7 +520,7 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				 */
 				node->hj_JoinState = HJ_NEED_NEW_OUTER;
 
-				if (!node->hj_MatchedOuter &&
+				if (!node->hj_MatchedOuter && // (node)->hj_NullInnerTupleSlot!=NULL
 					HJ_FILL_OUTER(node))
 				{
 					/*
@@ -530,6 +542,7 @@ ExecHashJoinImpl(PlanState *pstate, bool parallel)
 				 * We have finished a batch, but we are doing right/full join,
 				 * so any unmatched inner tuples in the hashtable have to be
 				 * emitted before we continue to the next batch.
+				 * 把hashtable中为匹配的tuple放入exec slot
 				 */
 				if (!ExecScanHashTableForUnmatched(node, econtext))
 				{
@@ -685,7 +698,10 @@ ExecInitHashJoin(HashJoin *node, EState *estate, int eflags)
 	/* set up null tuples for outer joins, if needed */
 	switch (node->join.jointype)
 	{
+        // 对于内连接，对外部表初始化为默认为null
 		case JOIN_INNER:
+            hjstate->hj_NullInnerTupleSlot =
+                    ExecInitNullTupleSlot(estate, innerDesc, &TTSOpsVirtual);
 		case JOIN_SEMI:
 			break;
 		case JOIN_LEFT:

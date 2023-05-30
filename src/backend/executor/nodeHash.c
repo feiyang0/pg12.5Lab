@@ -1951,7 +1951,7 @@ ExecScanHashBucket(HashJoinState *hjstate,
 		hashTuple = hashtable->skewBucket[hjstate->hj_CurSkewBucketNo]->tuples;
 	else
 		hashTuple = hashtable->buckets.unshared[hjstate->hj_CurBucketNo];
-
+    // 遍历hash桶下的tuple链表，找到桶中匹配的数据，并将结果存放在hj_CurTuple中
 	while (hashTuple != NULL)
 	{
 		if (hashTuple->hashvalue == hashvalue)
