@@ -54,14 +54,11 @@ extern void ExecHashGetBucketAndBatch(HashJoinTable hashtable,
 									  int *bucketno,
 									  int *batchno);
 extern bool ExecScanHashBucket(HashJoinState *hjstate, ExprContext *econtext);
-
-extern bool ExecScanHashInnerOrOuter(HashJoinState *hjstate, ExprContext *econtext,bool inner);
-extern bool ExecScanHashNotMatch(HashJoinState *hjstate, ExprContext *econtext,bool inner);
-
 extern bool ExecParallelScanHashBucket(HashJoinState *hjstate, ExprContext *econtext);
 extern void ExecPrepHashTableForUnmatched(HashJoinState *hjstate);
 extern bool ExecScanHashTableForUnmatched(HashJoinState *hjstate,
 										  ExprContext *econtext);
+extern bool ExecScanOutHashTableForUnmatched(HashJoinState *hjstate, ExprContext *econtext);
 extern void ExecHashTableReset(HashJoinTable hashtable);
 extern void ExecHashTableResetMatchFlags(HashJoinTable hashtable);
 extern void ExecChooseHashTableSize(double ntuples, int tupwidth, bool useskew,
@@ -71,7 +68,7 @@ extern void ExecChooseHashTableSize(double ntuples, int tupwidth, bool useskew,
 									int *numbuckets,
 									int *numbatches,
 									int *num_skew_mcvs);
-extern int ExecHashGetSkewBucket(HashJoinTable hashtable, uint32 hashvalue);
+extern int	ExecHashGetSkewBucket(HashJoinTable hashtable, uint32 hashvalue);
 extern void ExecHashEstimate(HashState *node, ParallelContext *pcxt);
 extern void ExecHashInitializeDSM(HashState *node, ParallelContext *pcxt);
 extern void ExecHashInitializeWorker(HashState *node, ParallelWorkerContext *pwcxt);
@@ -80,4 +77,4 @@ extern void ExecShutdownHash(HashState *node);
 extern void ExecHashGetInstrumentation(HashInstrumentation *instrument,
 									   HashJoinTable hashtable);
 
-#endif /* NODEHASH_H */
+#endif							/* NODEHASH_H */

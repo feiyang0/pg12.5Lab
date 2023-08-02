@@ -719,7 +719,7 @@ try_partial_mergejoin_path(PlannerInfo *root,
  *	  the joinrel's pathlist via add_path().
  */
 static void
-try_hashjoin_path(PlannerInfo *root,
+try_hashjoin_path(PlannerInfo *root, //将新的路径加入到joinrel中，之后会根据路径的cost值大小选择最优路径，symhashjoin可以复用这个函数，追加symhahjoin的路径
 				  RelOptInfo *joinrel,
 				  Path *outer_path,
 				  Path *inner_path,
@@ -773,6 +773,36 @@ try_hashjoin_path(PlannerInfo *root,
 		/* Waste no memory when we reject a path here */
 		bms_free(required_outer);
 	}
+
+	//在这里添加你的实现
+	//可以阅读本文件的751行～775行来理解如何创建一个可行路径并加入路径集合中
+	//需要调用create_symhashjoin_path来创建一个symhashjoin路径
+    //
+    initial_cost_symhashjoin(root, &workspace, jointype, hashclauses,
+                          outer_path, inner_path, extra, false);
+
+    if (add_path_precheck(joinrel,
+                          workspace.startup_cost, workspace.total_cost,
+                          NIL, required_outer))
+    {
+        add_path(joinrel, (Path *)
+                create_symhashjoin_path(root,
+                                     joinrel,
+                                     jointype,
+                                     &workspace,
+                                     extra,
+                                     outer_path,
+                                     inner_path,
+                                     false,	/* parallel_hash */
+                                     extra->restrictlist,
+                                     required_outer,
+                                     hashclauses));
+    }
+    else
+    {
+        /* Waste no memory when we reject a path here */
+        bms_free(required_outer);
+    }
 }
 
 /*
